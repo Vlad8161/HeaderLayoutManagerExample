@@ -1,6 +1,7 @@
 package dev.klippe.customlayoutmanager;
 
 import android.support.v7.widget.RecyclerView;
+import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -9,6 +10,8 @@ import android.view.ViewGroup;
  */
 
 public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
+    private int mHiddenOffset = 0;
+
     @Override
     public RecyclerView.LayoutParams generateDefaultLayoutParams() {
         return new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
@@ -17,6 +20,7 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
 
     @Override
     public void onLayoutChildren(RecyclerView.Recycler recycler, RecyclerView.State state) {
+        mHiddenOffset = 0;
         int itemCount = getItemCount();
 
         if (itemCount == 0) {
@@ -28,7 +32,7 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
         int currYPos = 0;
         while (fill && iCurrItem < itemCount) {
             View v = recycler.getViewForPosition(iCurrItem);
-            addView(v);
+            addView(v, 0);
             int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
             int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
             v.measure(widthMeasureSpec, heightMeasureSpec);
@@ -47,22 +51,48 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
 
     @Override
     public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerView.State state) {
-        dy = limitOffset(dy);
-        offsetChildrenVertical(-dy);
+        int offset = -limitOffset(dy);
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            int childOffset = offset;
+            if (childOffset < 0) {
+                if (getPosition(child) == 1) {
+                    int absOffsetLimit = Math.abs(Math.min(0, -getDecoratedTop(child)));
+                    int absChildOffset = Math.abs(childOffset);
+                    if (absChildOffset > absOffsetLimit) {
+                        mHiddenOffset += absChildOffset - absOffsetLimit;
+                        childOffset = -absOffsetLimit;
+                    }
+                }
+            } else {
+                if (getPosition(child) == 1) {
+                    if (mHiddenOffset > 0) {
+                        if (mHiddenOffset >= childOffset) {
+                            mHiddenOffset -= childOffset;
+                            childOffset = 0;
+                        } else {
+                            childOffset -= mHiddenOffset;
+                            mHiddenOffset = 0;
+                        }
+                    }
+                }
+            }
+            child.offsetTopAndBottom(childOffset);
+        }
         fillTopWithViews(recycler);
         fillBottomWithViews(recycler);
         return dy;
     }
 
     private void fillTopWithViews(RecyclerView.Recycler recycler) {
-        View topView = getChildAt(0);
+        View topView = getChildAt(getChildCount() - 1);
         if (getDecoratedTop(topView) > 0) {
             /* Появилось пространсво сверху */
             int top = getDecoratedTop(topView);
             int pos = getPosition(topView) - 1;
             while (pos >= 0 && top > 0) {
                 View v = recycler.getViewForPosition(pos);
-                addView(v, 0);
+                addView(v);
                 int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
                 int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
                 v.measure(widthMeasureSpec, heightMeasureSpec);
@@ -73,7 +103,7 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
         } else if (getDecoratedBottom(topView) < 0) {
             /* Вьюха сверху улетела далеко вверх */
             while (getDecoratedBottom(getChildAt(0)) < 0) {
-                View v = getChildAt(0);
+                View v = getChildAt(getChildCount() - 1);
                 detachView(v);
                 recycler.recycleView(v);
             }
@@ -81,14 +111,14 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private void fillBottomWithViews(RecyclerView.Recycler recycler) {
-        View bottomView = getChildAt(getChildCount() - 1);
+        View bottomView = getChildAt(0);
         if (getDecoratedBottom(bottomView) < getHeight()) {
             /* Появилось пространство снизу */
             int bottom = getDecoratedBottom(bottomView);
             int pos = getPosition(bottomView) + 1;
             while (pos < getItemCount() && bottom < getHeight()) {
                 View v = recycler.getViewForPosition(pos);
-                addView(v);
+                addView(v, 0);
                 int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
                 int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
                 v.measure(widthMeasureSpec, heightMeasureSpec);
@@ -99,7 +129,7 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
         } else if (getDecoratedTop(bottomView) > getHeight()) {
             /* Вьюха снизу улетела далеко вниз */
             while (getDecoratedTop(getChildAt(getChildCount() - 1)) > getHeight()) {
-                View v = getChildAt(getChildCount() - 1);
+                View v = getChildAt(0);
                 detachView(v);
                 recycler.recycleView(v);
             }
@@ -107,8 +137,8 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private int limitOffset(int dy) {
-        View topView = getChildAt(0);
-        View bottomView = getChildAt(getChildCount() - 1);
+        View topView = getChildAt(getChildCount() - 1);
+        View bottomView = getChildAt(0);
 
         int allViewsSize = getDecoratedBottom(bottomView) - getDecoratedTop(topView);
         if (allViewsSize < getHeight()) {

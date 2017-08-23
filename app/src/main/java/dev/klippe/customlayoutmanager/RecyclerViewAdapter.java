@@ -30,9 +30,9 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
             case TYPE_1:
                 return new ViewHolderType1(LayoutInflater.from(mContext).inflate(R.layout.item_1, parent, false));
             case TYPE_2:
-                return new ViewHolderType2(LayoutInflater.from(mContext).inflate(R.layout.item_3, parent, false));
+                return new ViewHolderType2(LayoutInflater.from(mContext).inflate(R.layout.item_2, parent, false));
             case TYPE_3:
-                return new ViewHolderType3(LayoutInflater.from(mContext).inflate(R.layout.item_2, parent, false));
+                return new ViewHolderType3(LayoutInflater.from(mContext).inflate(R.layout.item_3, parent, false));
             default:
                 return null;
         }
@@ -40,15 +40,13 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     @Override
     public int getItemViewType(int position) {
-        switch (position % 3) {
+        switch (position) {
             case 0:
                 return TYPE_1;
             case 1:
                 return TYPE_2;
-            case 2:
-                return TYPE_3;
             default:
-                return -1;
+                return TYPE_3;
         }
     }
 
@@ -58,7 +56,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     @Override
     public int getItemCount() {
-        return 50;
+        return 20;
     }
 
     private static class ViewHolderType1 extends RecyclerView.ViewHolder {
