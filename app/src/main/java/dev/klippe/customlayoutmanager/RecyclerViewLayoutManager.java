@@ -1,7 +1,6 @@
 package dev.klippe.customlayoutmanager;
 
 import android.support.v7.widget.RecyclerView;
-import android.util.Log;
 import android.view.View;
 import android.view.ViewGroup;
 
@@ -10,12 +9,13 @@ import android.view.ViewGroup;
  */
 
 public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
+    private static final String TAG = "RVLM";
     private int mHiddenOffset = 0;
 
     @Override
     public RecyclerView.LayoutParams generateDefaultLayoutParams() {
         return new RecyclerView.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT);
+                ViewGroup.LayoutParams.MATCH_PARENT);
     }
 
     @Override
@@ -27,21 +27,20 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
             return;
         }
 
-        boolean fill = true;
-        int iCurrItem = 0;
-        int currYPos = 0;
-        while (fill && iCurrItem < itemCount) {
-            View v = recycler.getViewForPosition(iCurrItem);
-            addView(v, 0);
-            int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
-            int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
-            v.measure(widthMeasureSpec, heightMeasureSpec);
-            layoutDecorated(v, 0, currYPos, getDecoratedMeasuredWidth(v), currYPos + getDecoratedMeasuredHeight(v));
+        View headerView = recycler.getViewForPosition(1);
+        addView(headerView);
+        int headerViewWidthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
+        int headerViewHeightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
+        headerView.measure(headerViewWidthMeasureSpec, headerViewHeightMeasureSpec);
+        layoutDecorated(headerView, 0, getHeight() - getDecoratedMeasuredHeight(headerView),
+                getDecoratedMeasuredWidth(headerView), getHeight());
 
-            currYPos = getDecoratedBottom(v);
-            iCurrItem++;
-            fill = currYPos < getHeight();
-        }
+        View mapView = recycler.getViewForPosition(0);
+        addView(mapView);
+        int mapViewWidthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
+        int mapViewHeightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight() - getDecoratedMeasuredHeight(headerView), View.MeasureSpec.EXACTLY);
+        mapView.measure(mapViewWidthMeasureSpec, mapViewHeightMeasureSpec);
+        layoutDecorated(mapView, 0, 0, getDecoratedMeasuredWidth(mapView), getDecoratedMeasuredHeight(mapView));
     }
 
     @Override
@@ -52,32 +51,43 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
     @Override
     public int scrollVerticallyBy(int dy, RecyclerView.Recycler recycler, RecyclerView.State state) {
         int offset = -limitOffset(dy);
-        for (int i = 0; i < getChildCount(); i++) {
-            View child = getChildAt(i);
-            int childOffset = offset;
-            if (childOffset < 0) {
-                if (getPosition(child) == 1) {
-                    int absOffsetLimit = Math.abs(Math.min(0, -getDecoratedTop(child)));
-                    int absChildOffset = Math.abs(childOffset);
-                    if (absChildOffset > absOffsetLimit) {
-                        mHiddenOffset += absChildOffset - absOffsetLimit;
-                        childOffset = -absOffsetLimit;
-                    }
-                }
-            } else {
-                if (getPosition(child) == 1) {
-                    if (mHiddenOffset > 0) {
-                        if (mHiddenOffset >= childOffset) {
-                            mHiddenOffset -= childOffset;
-                            childOffset = 0;
-                        } else {
-                            childOffset -= mHiddenOffset;
-                            mHiddenOffset = 0;
-                        }
-                    }
+        View headerView = findViewByPosition(1);
+        int headerOffset = offset;
+        if (headerOffset < 0) {
+            int absOffsetLimit = Math.abs(Math.min(0, -getDecoratedTop(headerView)));
+            int absChildOffset = Math.abs(headerOffset);
+            if (absChildOffset > absOffsetLimit) {
+                mHiddenOffset += absChildOffset - absOffsetLimit;
+                headerOffset = -absOffsetLimit;
+            }
+        } else {
+            if (mHiddenOffset > 0) {
+                if (mHiddenOffset >= headerOffset) {
+                    mHiddenOffset -= headerOffset;
+                    headerOffset = 0;
+                } else {
+                    headerOffset -= mHiddenOffset;
+                    mHiddenOffset = 0;
                 }
             }
-            child.offsetTopAndBottom(childOffset);
+        }
+
+        headerView.offsetTopAndBottom(headerOffset);
+
+        View mapView = recycler.getViewForPosition(0);
+        addView(mapView);
+        int mapViewWidthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
+        int mapViewHeightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getDecoratedTop(headerView), View.MeasureSpec.EXACTLY);
+        mapView.measure(mapViewWidthMeasureSpec, mapViewHeightMeasureSpec);
+        layoutDecorated(mapView, 0, 0, getDecoratedMeasuredWidth(mapView), getDecoratedMeasuredHeight(mapView));
+
+        for (int i = 0; i < getChildCount(); i++) {
+            View child = getChildAt(i);
+            int position = getPosition(child);
+            if (position == 0 || position == 1) {
+                continue;
+            }
+            child.offsetTopAndBottom(offset);
         }
         fillTopWithViews(recycler);
         fillBottomWithViews(recycler);
@@ -85,14 +95,18 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private void fillTopWithViews(RecyclerView.Recycler recycler) {
-        View topView = getChildAt(getChildCount() - 1);
-        if (getDecoratedTop(topView) > 0) {
+        if (getChildCount() <= 2) {
+            return;
+        }
+        View topView = getChildAt(getChildCount() - 3);
+        View headerView = getChildAt(getChildCount() - 2);
+        if (getDecoratedTop(topView) > getDecoratedBottom(headerView)) {
             /* Появилось пространсво сверху */
             int top = getDecoratedTop(topView);
             int pos = getPosition(topView) - 1;
-            while (pos >= 0 && top > 0) {
+            while (pos >= 2 && top > getDecoratedBottom(headerView)) {
                 View v = recycler.getViewForPosition(pos);
-                addView(v);
+                addView(v, getChildCount() - 2);
                 int widthMeasureSpec = View.MeasureSpec.makeMeasureSpec(getWidth(), View.MeasureSpec.EXACTLY);
                 int heightMeasureSpec = View.MeasureSpec.makeMeasureSpec(getHeight(), View.MeasureSpec.UNSPECIFIED);
                 v.measure(widthMeasureSpec, heightMeasureSpec);
@@ -100,10 +114,10 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
                 top = getDecoratedTop(v);
                 pos--;
             }
-        } else if (getDecoratedBottom(topView) < 0) {
+        } else if (getDecoratedBottom(topView) < getDecoratedBottom(headerView)) {
             /* Вьюха сверху улетела далеко вверх */
-            while (getDecoratedBottom(getChildAt(0)) < 0) {
-                View v = getChildAt(getChildCount() - 1);
+            while (getDecoratedBottom(getChildAt(getChildCount() - 3)) < 0) {
+                View v = getChildAt(getChildCount() - 3);
                 detachView(v);
                 recycler.recycleView(v);
             }
@@ -128,7 +142,7 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
             }
         } else if (getDecoratedTop(bottomView) > getHeight()) {
             /* Вьюха снизу улетела далеко вниз */
-            while (getDecoratedTop(getChildAt(getChildCount() - 1)) > getHeight()) {
+            while (getDecoratedTop(getChildAt(0)) > getHeight()) {
                 View v = getChildAt(0);
                 detachView(v);
                 recycler.recycleView(v);
@@ -137,22 +151,15 @@ public class RecyclerViewLayoutManager extends RecyclerView.LayoutManager {
     }
 
     private int limitOffset(int dy) {
-        View topView = getChildAt(getChildCount() - 1);
+        View headerView = findViewByPosition(1);
         View bottomView = getChildAt(0);
 
-        int allViewsSize = getDecoratedBottom(bottomView) - getDecoratedTop(topView);
-        if (allViewsSize < getHeight()) {
-            return 0;
-        }
-
         if (dy < 0) {
-            if (getPosition(topView) == 0) {
-                return Math.max(dy, getDecoratedTop(topView));
-            } else {
-                return dy;
-            }
+            /* Скролл вниз */
+            return Math.max(dy, getDecoratedBottom(headerView) - getHeight());
         } else if (dy > 0) {
-            if (getPosition(bottomView) == getItemCount() - 1) {
+            /* Скролл вверх */
+            if (getItemCount() > 2 && getPosition(bottomView) == getItemCount() - 1) {
                 return Math.min(dy, getDecoratedBottom(bottomView) - getHeight());
             } else {
                 return dy;

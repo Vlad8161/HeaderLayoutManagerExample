@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">CustomLayoutManager</string>
+    <string name="google_maps_key" templateMergeStrategy="preserve" translatable="false">AIzaSyC6tXneOn5EGhST2QRKVYfMVgLzyur1ssI</string>
 </resources>

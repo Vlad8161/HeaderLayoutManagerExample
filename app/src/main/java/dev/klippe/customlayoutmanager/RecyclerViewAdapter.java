@@ -6,6 +6,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.TextView;
+
+import com.google.android.gms.maps.MapView;
 
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -18,17 +21,24 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     private static final int TYPE_2 = 1;
     private static final int TYPE_3 = 2;
 
+    private MapView mMapView;
+
     private Context mContext;
 
     RecyclerViewAdapter(Context context) {
         this.mContext = context;
+        this.mMapView = new MapView(mContext);
+    }
+
+    public MapView getMapView() {
+        return mMapView;
     }
 
     @Override
     public RecyclerView.ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         switch (viewType) {
             case TYPE_1:
-                return new ViewHolderType1(LayoutInflater.from(mContext).inflate(R.layout.item_1, parent, false));
+                return new ViewHolderType1(mMapView);
             case TYPE_2:
                 return new ViewHolderType2(LayoutInflater.from(mContext).inflate(R.layout.item_2, parent, false));
             case TYPE_3:
@@ -52,6 +62,10 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
 
     @Override
     public void onBindViewHolder(RecyclerView.ViewHolder holder, int position) {
+        if (holder.getItemViewType() == TYPE_3) {
+            ViewHolderType3 h = (ViewHolderType3) holder;
+            h.text.setText("" + position);
+        }
     }
 
     @Override
@@ -72,8 +86,10 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
     }
 
     private static class ViewHolderType3 extends RecyclerView.ViewHolder {
+        private TextView text;
         ViewHolderType3(View itemView) {
             super(itemView);
+            text = (TextView) itemView.findViewById(R.id.text);
         }
     }
 }
